@@ -1,0 +1,20 @@
+{
+  "name": "web3-university-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Web3 University platform",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.js",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "@aave/core-v3": "^1.19.0",
+    "dotenv": "^16.3.1"
+  }
+}
