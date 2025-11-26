@@ -27,7 +27,7 @@ contract YDToken is ERC20, Ownable {
     /**
      * @dev 购买YD代币
      */
-    function buyTokens() external payable {
+    function buyTokens() public payable {
         require(msg.value > 0, "Must send ETH to buy tokens");
 
         uint256 tokenAmount = (msg.value * 10**18) / tokenPrice;

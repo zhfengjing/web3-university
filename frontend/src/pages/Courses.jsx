@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useReadContract } from 'wagmi';
+import { useReadContract, useConfig } from 'wagmi';
+import { readContract } from '@wagmi/core';
 import { BookOpen, Search } from 'lucide-react';
 import CourseCard from '../components/CourseCard';
 import { CONTRACTS, COURSE_MANAGER_ABI } from '../config/contracts';
@@ -8,6 +9,7 @@ import { formatEther } from 'viem';
 export default function Courses() {
   const [courses, setCourses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const config = useConfig();
 
   // 读取课程数量
   const { data: courseCount } = useReadContract({
@@ -29,21 +31,22 @@ export default function Courses() {
 
     for (let i = 1; i <= count; i++) {
       try {
-        const response = await fetch(
-          `/api/contracts/${CONTRACTS.COURSE_MANAGER}/read/getCourse?args=${i}`
-        );
-        if (response.ok) {
-          const course = await response.json();
-          loadedCourses.push({
-            id: Number(course.id),
-            title: course.title,
-            description: course.description,
-            author: course.author,
-            priceInYD: formatEther(course.priceInYD),
-            totalEnrolled: Number(course.totalEnrolled),
-            isActive: course.isActive,
-          });
-        }
+        const course = await readContract(config, {
+          address: CONTRACTS.COURSE_MANAGER,
+          abi: COURSE_MANAGER_ABI,
+          functionName: 'getCourse',
+          args: [i],
+        });
+
+        loadedCourses.push({
+          id: Number(course.id),
+          title: course.title,
+          description: course.description,
+          author: course.author,
+          priceInYD: formatEther(course.priceInYD),
+          totalEnrolled: Number(course.totalEnrolled),
+          isActive: course.isActive,
+        });
       } catch (error) {
         console.error(`Error loading course ${i}:`, error);
       }

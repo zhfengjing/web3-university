@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useSignMessage } from 'wagmi';
+import { useAccount, useSignMessage, useReadContract, useConfig } from 'wagmi';
+import { readContract } from '@wagmi/core';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { User, BookOpen, Edit2, Save, X } from 'lucide-react';
 import { API_URL, CONTRACTS, COURSE_MANAGER_ABI } from '../config/contracts';
-import { useReadContract } from 'wagmi';
 import { formatEther } from 'viem';
 
 export default function Profile() {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
+  const config = useConfig();
 
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -60,20 +61,21 @@ export default function Profile() {
 
       for (const purchase of purchases) {
         const courseId = Number(purchase.courseId);
-        const response = await fetch(
-          `/api/contracts/${CONTRACTS.COURSE_MANAGER}/read/getCourse?args=${courseId}`
-        );
 
-        if (response.ok) {
-          const course = await response.json();
-          coursesData.push({
-            id: courseId,
-            title: course.title,
-            description: course.description,
-            priceInYD: formatEther(course.priceInYD),
-            purchasedAt: Number(purchase.purchasedAt),
-          });
-        }
+        const course = await readContract(config, {
+          address: CONTRACTS.COURSE_MANAGER,
+          abi: COURSE_MANAGER_ABI,
+          functionName: 'getCourse',
+          args: [courseId],
+        });
+
+        coursesData.push({
+          id: courseId,
+          title: course.title,
+          description: course.description,
+          priceInYD: formatEther(course.priceInYD),
+          purchasedAt: Number(purchase.purchasedAt),
+        });
       }
 
       setPurchasedCourses(coursesData);
