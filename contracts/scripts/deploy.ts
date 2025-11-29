@@ -12,23 +12,6 @@ interface DeploymentInfo {
   };
 }
 
-const { getAddress } = ethers;
-
-// 原始地址 (全小写或您之前使用的版本)
-const rawAddress = "0x6ae43d3271ff6fbe86ecd74769e6b0c5b3b7f5fe"; 
-function getFinalAddress(rawAddress:string) {
-  try {
-      // 使用 getAddress 强制转换为正确的校验和格式
-      const checkedAddress = getAddress(rawAddress); 
-      
-      console.log(`规范化地址: ${checkedAddress}`);
-    return checkedAddress;
-      // 在部署合约时，使用 checkedAddress 代替硬编码的地址
-      // deployContract(..., checkedAddress);
-  } catch (error) {
-      console.error("地址转换失败:", error);
-  }
-}
 
 async function main(): Promise<void> {
   console.log("Starting deployment...\n");
@@ -57,23 +40,23 @@ async function main(): Promise<void> {
   // 3. 部署 AAVE Integration（仅在有配置时部署）
   let aaveIntegrationAddress: string = "Not deployed (configure AAVE addresses in .env)";
 
-  // if (process.env.AAVE_POOL_ADDRESS && process.env.USDT_ADDRESS) {
-  //   console.log("Deploying AAVE Integration...");
-  //   const AaveIntegration = await ethers.getContractFactory("AaveIntegration");
+  if (process.env.AAVE_POOL_ADDRESS && process.env.USDT_ADDRESS) {
+    console.log("Deploying AAVE Integration...");
+    const AaveIntegration = await ethers.getContractFactory("AaveIntegration");
 
-  //   // Uniswap V3 SwapRouter地址（Sepolia测试网）
-  //   const swapRouterAddress: string = "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E";
+    // Uniswap V3 SwapRouter地址（Sepolia测试网）
+    const swapRouterAddress: string = "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E";
 
-  //   const aaveIntegration = await AaveIntegration.deploy(
-  //     getFinalAddress(rawAddress),
-  //     swapRouterAddress,
-  //     process.env.USDT_ADDRESS,
-  //     ydTokenAddress
-  //   );
-  //   await aaveIntegration.waitForDeployment();
-  //   aaveIntegrationAddress = await aaveIntegration.getAddress();
-  //   console.log("AAVE Integration deployed to:", aaveIntegrationAddress, "\n");
-  // }
+    const aaveIntegration = await AaveIntegration.deploy(
+      process.env.AAVE_POOL_ADDRESS,
+      swapRouterAddress,
+      process.env.USDT_ADDRESS,
+      ydTokenAddress
+    );
+    await aaveIntegration.waitForDeployment();
+    aaveIntegrationAddress = await aaveIntegration.getAddress();
+    console.log("AAVE Integration deployed to:", aaveIntegrationAddress, "\n");
+  }
 
   // 输出部署摘要
   console.log("========================================");
@@ -81,7 +64,7 @@ async function main(): Promise<void> {
   console.log("========================================");
   console.log("YD Token:", ydTokenAddress);
   console.log("Course Manager:", courseManagerAddress);
-  // console.log("AAVE Integration:", aaveIntegrationAddress);
+  console.log("AAVE Integration:", aaveIntegrationAddress);
   console.log("========================================\n");
 
   // 保存部署地址到文件
@@ -149,3 +132,14 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+
+  npx hardhat verify--network sepolia
+  
+  npx hardhat verify--network sepolia < CourseManager合约地址 > <YDToken合约地址>
+  
+  npx hardhat verify --network sepolia <AaveIntegration合约地址> \
+    <AAVE_POOL_ADDRESS> \
+    <SWAP_ROUTER_ADDRESS> \
+    <USDT_ADDRESS> \
+    <YDToken合约地址>

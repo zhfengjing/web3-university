@@ -3,6 +3,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import * as dotenv from "dotenv";
 
 dotenv.config();
+// 合约在Sourcify上验证的，配置的 sourcify: { enabled: true },
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -12,7 +13,7 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: 200
       }
-    }
+    },
   },
   networks: {
     hardhat: {
@@ -24,8 +25,22 @@ const config: HardhatUserConfig = {
       chainId: 11155111
     }
   },
+  // 临时注释掉 Etherscan，只使用 Sourcify 验证
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || ""
+    apiKey: process.env.ETHERSCAN_API_KEY || "",
+    customChains: [
+      {
+        network: "sepolia",
+        chainId: 11155111,
+        urls: {
+          apiURL: "https://api-sepolia.etherscan.io/api",
+          browserURL: "https://sepolia.etherscan.io"
+        }
+      }
+    ]
+  },
+  sourcify: {
+    enabled: true
   },
   paths: {
     sources: "./contracts",
