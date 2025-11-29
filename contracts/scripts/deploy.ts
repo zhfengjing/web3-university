@@ -132,14 +132,3 @@ main()
     console.error(error);
     process.exit(1);
   });
-
-
-  npx hardhat verify--network sepolia
-  
-  npx hardhat verify--network sepolia < CourseManager合约地址 > <YDToken合约地址>
-  
-  npx hardhat verify --network sepolia <AaveIntegration合约地址> \
-    <AAVE_POOL_ADDRESS> \
-    <SWAP_ROUTER_ADDRESS> \
-    <USDT_ADDRESS> \
-    <YDToken合约地址>
