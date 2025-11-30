@@ -27,6 +27,8 @@ export default function Profile() {
   const [calculatorDays, setCalculatorDays] = useState('365');
   const [stakeAmount, setStakeAmount] = useState(''); // 从钱包质押的金额
   const [showStakeModal, setShowStakeModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null); // 正在编辑的课程
+  const [newPrice, setNewPrice] = useState(''); // 新价格
 
   // 读取用户购买记录
   const { data: purchases } = useReadContract({
@@ -92,6 +94,13 @@ export default function Profile() {
 
   const { isLoading: isStaking, isSuccess: isStakeSuccess } = useWaitForTransactionReceipt({
     hash: stakeHash,
+  });
+
+  // 更新课程价格的合约调用
+  const { data: updatePriceHash, writeContract: updateCoursePrice } = useWriteContract();
+
+  const { isLoading: isUpdatingPrice, isSuccess: isUpdatePriceSuccess } = useWaitForTransactionReceipt({
+    hash: updatePriceHash,
   });
 
   useEffect(() => {
@@ -185,6 +194,16 @@ export default function Profile() {
       alert('质押成功！开始赚取 ' + (annualYieldRate ? (Number(annualYieldRate) / 100).toFixed(2) : '5.00') + '% 年化收益。');
     }
   }, [isStakeSuccess, aaveTransferStep]);
+
+  // 监听课程价格更新成功
+  useEffect(() => {
+    if (isUpdatePriceSuccess) {
+      setEditingCourse(null);
+      setNewPrice('');
+      loadCreatedCourses();
+      alert('课程价格更新成功！');
+    }
+  }, [isUpdatePriceSuccess]);
 
   const loadProfile = async () => {
     try {
@@ -406,6 +425,26 @@ export default function Profile() {
     } catch (error) {
       console.error('Stake from wallet error:', error);
       alert('质押失败：' + error.message);
+    }
+  };
+
+  // 更新课程价格
+  const handleUpdateCoursePrice = async () => {
+    if (!newPrice || parseFloat(newPrice) <= 0) {
+      alert('请输入有效的价格');
+      return;
+    }
+
+    try {
+      updateCoursePrice({
+        address: CONTRACTS.COURSE_MANAGER,
+        abi: COURSE_MANAGER_ABI,
+        functionName: 'updateCoursePrice',
+        args: [editingCourse.id, parseEther(newPrice)],
+      });
+    } catch (error) {
+      console.error('Update course price error:', error);
+      alert('更新失败：' + error.message);
     }
   };
 
@@ -910,9 +949,22 @@ export default function Profile() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <Link to={`/courses/${course.id}`} className="hover:text-blue-400">
-                      <h3 className="text-lg font-bold mb-2">{course.title}</h3>
-                    </Link>
+                    <div className="flex items-center justify-between mb-2">
+                      <Link to={`/courses/${course.id}`} className="hover:text-blue-400">
+                        <h3 className="text-lg font-bold">{course.title}</h3>
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setEditingCourse(course);
+                          setNewPrice(course.priceInYD);
+                        }}
+                        className="flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
+                        title="编辑课程价格"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                        <span>编辑价格</span>
+                      </button>
+                    </div>
                     <p className="text-gray-300 text-sm line-clamp-2 mb-2">
                       {course.description}
                     </p>
@@ -1121,6 +1173,67 @@ export default function Profile() {
                 }`}
               >
                 {isApproving ? '授权中...' : isStaking ? '质押中...' : '确认质押'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 编辑课程价格弹窗 */}
+      {editingCourse && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 border border-blue-500/30">
+            <h3 className="text-2xl font-bold mb-4">编辑课程价格</h3>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-400 mb-2">课程名称</p>
+              <p className="text-lg font-bold text-white mb-4">{editingCourse.title}</p>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-400 mb-2">当前价格</p>
+              <p className="text-xl font-bold text-blue-400 mb-4">{editingCourse.priceInYD} YD</p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">新价格 (YD)</label>
+              <input
+                type="number"
+                value={newPrice}
+                onChange={(e) => setNewPrice(e.target.value)}
+                className="input-field w-full"
+                placeholder="输入新价格"
+                min="0"
+                step="0.01"
+              />
+            </div>
+
+            <div className="mb-6 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm">
+              <p className="text-yellow-400">
+                ⚠️ 注意：由于区块链的不可篡改性，只能修改课程价格，无法修改课程标题和描述。
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  setEditingCourse(null);
+                  setNewPrice('');
+                }}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleUpdateCoursePrice}
+                disabled={!newPrice || parseFloat(newPrice) <= 0 || isUpdatingPrice}
+                className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  !newPrice || parseFloat(newPrice) <= 0 || isUpdatingPrice
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isUpdatingPrice ? '更新中...' : '确认更新'}
               </button>
             </div>
           </div>
