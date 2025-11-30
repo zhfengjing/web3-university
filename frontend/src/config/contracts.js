@@ -4,6 +4,72 @@ export const CONTRACTS = {
   AAVE_INTEGRATION: import.meta.env.VITE_AAVE_INTEGRATION_ADDRESS || '',
 };
 
+// AAVE Integration ABI - 包含用户理财相关函数
+export const AAVE_INTEGRATION_ABI = [
+  {
+    "inputs": [],
+    "name": "getYDBalance",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalStaked",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "annualYieldRate",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "amount", "type": "uint256"}],
+    "name": "stakeYD",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "user", "type": "address"}],
+    "name": "calculateReward",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "claimReward",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "unstake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "user", "type": "address"}],
+    "name": "getUserStakeInfo",
+    "outputs": [
+      {"internalType": "uint256", "name": "ydAmount", "type": "uint256"},
+      {"internalType": "uint256", "name": "usdtAmount", "type": "uint256"},
+      {"internalType": "uint256", "name": "stakedAt", "type": "uint256"},
+      {"internalType": "uint256", "name": "pendingReward", "type": "uint256"},
+      {"internalType": "bool", "name": "isActive", "type": "bool"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+];
+
 export const YD_TOKEN_ABI = [
     {
       "inputs": [],
@@ -487,7 +553,7 @@ export const YD_TOKEN_ABI = [
       "stateMutability": "payable",
       "type": "receive"
     }
-  ];
+];
 
 export const COURSE_MANAGER_ABI = [
     {
@@ -1080,6 +1146,6 @@ export const COURSE_MANAGER_ABI = [
       "stateMutability": "view",
       "type": "function"
     }
-  ]
+];
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';

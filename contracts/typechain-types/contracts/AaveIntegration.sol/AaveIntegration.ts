@@ -27,18 +27,26 @@ export interface AaveIntegrationInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "aavePool"
+      | "annualYieldRate"
+      | "calculateReward"
+      | "claimReward"
       | "getUSDTBalance"
+      | "getUserStakeInfo"
       | "getYDBalance"
       | "owner"
       | "renounceOwnership"
       | "stakeToAave"
+      | "stakeYD"
       | "stakedAmount"
       | "swapETHToUSDT"
       | "swapRouter"
       | "swapYDToUSDT"
       | "totalStaked"
       | "transferOwnership"
+      | "unstake"
+      | "updateYieldRate"
       | "usdtAddress"
+      | "userStakes"
       | "withdrawFromAave"
       | "withdrawUSDT"
       | "ydTokenAddress"
@@ -47,15 +55,34 @@ export interface AaveIntegrationInterface extends Interface {
   getEvent(
     nameOrSignatureOrTopic:
       | "OwnershipTransferred"
+      | "RewardClaimed"
       | "StakedToAave"
       | "TokensSwapped"
+      | "UserStaked"
       | "WithdrawnFromAave"
+      | "YieldRateUpdated"
   ): EventFragment;
 
   encodeFunctionData(functionFragment: "aavePool", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "annualYieldRate",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "calculateReward",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "claimReward",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "getUSDTBalance",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getUserStakeInfo",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getYDBalance",
@@ -68,6 +95,10 @@ export interface AaveIntegrationInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "stakeToAave",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "stakeYD",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -94,9 +125,18 @@ export interface AaveIntegrationInterface extends Interface {
     functionFragment: "transferOwnership",
     values: [AddressLike]
   ): string;
+  encodeFunctionData(functionFragment: "unstake", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "updateYieldRate",
+    values: [BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "usdtAddress",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "userStakes",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "withdrawFromAave",
@@ -113,7 +153,23 @@ export interface AaveIntegrationInterface extends Interface {
 
   decodeFunctionResult(functionFragment: "aavePool", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "annualYieldRate",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "calculateReward",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "claimReward",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getUSDTBalance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getUserStakeInfo",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -129,6 +185,7 @@ export interface AaveIntegrationInterface extends Interface {
     functionFragment: "stakeToAave",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "stakeYD", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "stakedAmount",
     data: BytesLike
@@ -150,10 +207,16 @@ export interface AaveIntegrationInterface extends Interface {
     functionFragment: "transferOwnership",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "unstake", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "updateYieldRate",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "usdtAddress",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "userStakes", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "withdrawFromAave",
     data: BytesLike
@@ -174,6 +237,19 @@ export namespace OwnershipTransferredEvent {
   export interface OutputObject {
     previousOwner: string;
     newOwner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace RewardClaimedEvent {
+  export type InputTuple = [user: AddressLike, amount: BigNumberish];
+  export type OutputTuple = [user: string, amount: bigint];
+  export interface OutputObject {
+    user: string;
+    amount: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -219,12 +295,49 @@ export namespace TokensSwappedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
+export namespace UserStakedEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    ydAmount: BigNumberish,
+    usdtAmount: BigNumberish,
+    timestamp: BigNumberish
+  ];
+  export type OutputTuple = [
+    user: string,
+    ydAmount: bigint,
+    usdtAmount: bigint,
+    timestamp: bigint
+  ];
+  export interface OutputObject {
+    user: string;
+    ydAmount: bigint;
+    usdtAmount: bigint;
+    timestamp: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
 export namespace WithdrawnFromAaveEvent {
   export type InputTuple = [user: AddressLike, amount: BigNumberish];
   export type OutputTuple = [user: string, amount: bigint];
   export interface OutputObject {
     user: string;
     amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace YieldRateUpdatedEvent {
+  export type InputTuple = [newRate: BigNumberish];
+  export type OutputTuple = [newRate: bigint];
+  export interface OutputObject {
+    newRate: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -277,7 +390,27 @@ export interface AaveIntegration extends BaseContract {
 
   aavePool: TypedContractMethod<[], [string], "view">;
 
+  annualYieldRate: TypedContractMethod<[], [bigint], "view">;
+
+  calculateReward: TypedContractMethod<[user: AddressLike], [bigint], "view">;
+
+  claimReward: TypedContractMethod<[], [void], "nonpayable">;
+
   getUSDTBalance: TypedContractMethod<[], [bigint], "view">;
+
+  getUserStakeInfo: TypedContractMethod<
+    [user: AddressLike],
+    [
+      [bigint, bigint, bigint, bigint, boolean] & {
+        ydAmount: bigint;
+        usdtAmount: bigint;
+        stakedAt: bigint;
+        pendingReward: bigint;
+        isActive: boolean;
+      }
+    ],
+    "view"
+  >;
 
   getYDBalance: TypedContractMethod<[], [bigint], "view">;
 
@@ -290,6 +423,8 @@ export interface AaveIntegration extends BaseContract {
     [void],
     "nonpayable"
   >;
+
+  stakeYD: TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
 
   stakedAmount: TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
@@ -315,7 +450,29 @@ export interface AaveIntegration extends BaseContract {
     "nonpayable"
   >;
 
+  unstake: TypedContractMethod<[], [void], "nonpayable">;
+
+  updateYieldRate: TypedContractMethod<
+    [newRate: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
   usdtAddress: TypedContractMethod<[], [string], "view">;
+
+  userStakes: TypedContractMethod<
+    [arg0: AddressLike],
+    [
+      [bigint, bigint, bigint, bigint, boolean] & {
+        ydAmount: bigint;
+        usdtAmount: bigint;
+        stakedAt: bigint;
+        lastClaimAt: bigint;
+        isActive: boolean;
+      }
+    ],
+    "view"
+  >;
 
   withdrawFromAave: TypedContractMethod<
     [amount: BigNumberish],
@@ -339,8 +496,32 @@ export interface AaveIntegration extends BaseContract {
     nameOrSignature: "aavePool"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
+    nameOrSignature: "annualYieldRate"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "calculateReward"
+  ): TypedContractMethod<[user: AddressLike], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "claimReward"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
     nameOrSignature: "getUSDTBalance"
   ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "getUserStakeInfo"
+  ): TypedContractMethod<
+    [user: AddressLike],
+    [
+      [bigint, bigint, bigint, bigint, boolean] & {
+        ydAmount: bigint;
+        usdtAmount: bigint;
+        stakedAt: bigint;
+        pendingReward: bigint;
+        isActive: boolean;
+      }
+    ],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "getYDBalance"
   ): TypedContractMethod<[], [bigint], "view">;
@@ -352,6 +533,9 @@ export interface AaveIntegration extends BaseContract {
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "stakeToAave"
+  ): TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "stakeYD"
   ): TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "stakedAmount"
@@ -376,8 +560,29 @@ export interface AaveIntegration extends BaseContract {
     nameOrSignature: "transferOwnership"
   ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "unstake"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "updateYieldRate"
+  ): TypedContractMethod<[newRate: BigNumberish], [void], "nonpayable">;
+  getFunction(
     nameOrSignature: "usdtAddress"
   ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "userStakes"
+  ): TypedContractMethod<
+    [arg0: AddressLike],
+    [
+      [bigint, bigint, bigint, bigint, boolean] & {
+        ydAmount: bigint;
+        usdtAmount: bigint;
+        stakedAt: bigint;
+        lastClaimAt: bigint;
+        isActive: boolean;
+      }
+    ],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "withdrawFromAave"
   ): TypedContractMethod<[amount: BigNumberish], [bigint], "nonpayable">;
@@ -396,6 +601,13 @@ export interface AaveIntegration extends BaseContract {
     OwnershipTransferredEvent.OutputObject
   >;
   getEvent(
+    key: "RewardClaimed"
+  ): TypedContractEvent<
+    RewardClaimedEvent.InputTuple,
+    RewardClaimedEvent.OutputTuple,
+    RewardClaimedEvent.OutputObject
+  >;
+  getEvent(
     key: "StakedToAave"
   ): TypedContractEvent<
     StakedToAaveEvent.InputTuple,
@@ -410,11 +622,25 @@ export interface AaveIntegration extends BaseContract {
     TokensSwappedEvent.OutputObject
   >;
   getEvent(
+    key: "UserStaked"
+  ): TypedContractEvent<
+    UserStakedEvent.InputTuple,
+    UserStakedEvent.OutputTuple,
+    UserStakedEvent.OutputObject
+  >;
+  getEvent(
     key: "WithdrawnFromAave"
   ): TypedContractEvent<
     WithdrawnFromAaveEvent.InputTuple,
     WithdrawnFromAaveEvent.OutputTuple,
     WithdrawnFromAaveEvent.OutputObject
+  >;
+  getEvent(
+    key: "YieldRateUpdated"
+  ): TypedContractEvent<
+    YieldRateUpdatedEvent.InputTuple,
+    YieldRateUpdatedEvent.OutputTuple,
+    YieldRateUpdatedEvent.OutputObject
   >;
 
   filters: {
@@ -427,6 +653,17 @@ export interface AaveIntegration extends BaseContract {
       OwnershipTransferredEvent.InputTuple,
       OwnershipTransferredEvent.OutputTuple,
       OwnershipTransferredEvent.OutputObject
+    >;
+
+    "RewardClaimed(address,uint256)": TypedContractEvent<
+      RewardClaimedEvent.InputTuple,
+      RewardClaimedEvent.OutputTuple,
+      RewardClaimedEvent.OutputObject
+    >;
+    RewardClaimed: TypedContractEvent<
+      RewardClaimedEvent.InputTuple,
+      RewardClaimedEvent.OutputTuple,
+      RewardClaimedEvent.OutputObject
     >;
 
     "StakedToAave(address,uint256)": TypedContractEvent<
@@ -451,6 +688,17 @@ export interface AaveIntegration extends BaseContract {
       TokensSwappedEvent.OutputObject
     >;
 
+    "UserStaked(address,uint256,uint256,uint256)": TypedContractEvent<
+      UserStakedEvent.InputTuple,
+      UserStakedEvent.OutputTuple,
+      UserStakedEvent.OutputObject
+    >;
+    UserStaked: TypedContractEvent<
+      UserStakedEvent.InputTuple,
+      UserStakedEvent.OutputTuple,
+      UserStakedEvent.OutputObject
+    >;
+
     "WithdrawnFromAave(address,uint256)": TypedContractEvent<
       WithdrawnFromAaveEvent.InputTuple,
       WithdrawnFromAaveEvent.OutputTuple,
@@ -460,6 +708,17 @@ export interface AaveIntegration extends BaseContract {
       WithdrawnFromAaveEvent.InputTuple,
       WithdrawnFromAaveEvent.OutputTuple,
       WithdrawnFromAaveEvent.OutputObject
+    >;
+
+    "YieldRateUpdated(uint256)": TypedContractEvent<
+      YieldRateUpdatedEvent.InputTuple,
+      YieldRateUpdatedEvent.OutputTuple,
+      YieldRateUpdatedEvent.OutputObject
+    >;
+    YieldRateUpdated: TypedContractEvent<
+      YieldRateUpdatedEvent.InputTuple,
+      YieldRateUpdatedEvent.OutputTuple,
+      YieldRateUpdatedEvent.OutputObject
     >;
   };
 }
