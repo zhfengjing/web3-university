@@ -33,7 +33,7 @@ export default function Profile() {
   });
 
   // 读取课程总数
-  const { data: courseCount } = useReadContract({
+  const { data: courseCount, isError: isCourseCountError, isLoading: isCourseCountLoading } = useReadContract({
     address: CONTRACTS.COURSE_MANAGER,
     abi: COURSE_MANAGER_ABI,
     functionName: 'courseCount',
@@ -90,13 +90,30 @@ export default function Profile() {
   }, [purchases]);
 
   useEffect(() => {
-    if (courseCount !== undefined && address) {
-      loadCreatedCourses();
-    } else if (courseCount === undefined && address) {
-      // 如果courseCount还未加载完成，保持加载状态
-      setLoadingCreated(true);
+    if (!address) {
+      setLoadingCreated(false);
+      return;
     }
-  }, [courseCount, address]);
+
+    // 如果读取课程数量出错，设置为不加载状态
+    if (isCourseCountError) {
+      console.error('Failed to load course count');
+      setLoadingCreated(false);
+      setCreatedCourses([]);
+      return;
+    }
+
+    // 如果还在加载中，保持加载状态
+    if (isCourseCountLoading) {
+      setLoadingCreated(true);
+      return;
+    }
+
+    // 如果已经加载完成（无论courseCount是多少，包括0）
+    if (courseCount !== undefined) {
+      loadCreatedCourses();
+    }
+  }, [courseCount, address, isCourseCountError, isCourseCountLoading]);
 
   // 提取成功后重新加载课程收益
   useEffect(() => {
