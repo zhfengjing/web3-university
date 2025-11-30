@@ -25,6 +25,8 @@ export default function Profile() {
   const [aaveTransferAmount, setAaveTransferAmount] = useState(null);
   const [calculatorAmount, setCalculatorAmount] = useState('1000');
   const [calculatorDays, setCalculatorDays] = useState('365');
+  const [stakeAmount, setStakeAmount] = useState(''); // 从钱包质押的金额
+  const [showStakeModal, setShowStakeModal] = useState(false);
 
   // 读取用户购买记录
   const { data: purchases } = useReadContract({
@@ -42,7 +44,7 @@ export default function Profile() {
   });
 
   // 读取 AAVE 合约中的 YD 余额
-  const { data: aaveYDBalance } = useReadContract({
+  const { data: aaveYDBalance, refetch: refetchAaveBalance } = useReadContract({
     address: CONTRACTS.AAVE_INTEGRATION,
     abi: AAVE_INTEGRATION_ABI,
     functionName: 'getYDBalance',
@@ -60,6 +62,14 @@ export default function Profile() {
     address: CONTRACTS.AAVE_INTEGRATION,
     abi: AAVE_INTEGRATION_ABI,
     functionName: 'getUserStakeInfo',
+    args: [address],
+  });
+
+  // 读取用户钱包中的YD余额
+  const { data: walletYDBalance, refetch: refetchYDBalance } = useReadContract({
+    address: CONTRACTS.YD_TOKEN,
+    abi: YD_TOKEN_ABI,
+    functionName: 'balanceOf',
     args: [address],
   });
 
@@ -167,9 +177,12 @@ export default function Profile() {
       setTransferringToAave(null);
       setAaveTransferStep(null);
       setAaveTransferAmount(null);
+      setStakeAmount('');
       refetchStakeInfo();
+      refetchYDBalance();
+      refetchAaveBalance(); // 刷新理财合约总锁仓
       loadCreatedCourses();
-      alert('收益已成功存入理财账户！开始赚取 ' + (annualYieldRate ? (Number(annualYieldRate) / 100).toFixed(2) : '5.00') + '% 年化收益。');
+      alert('质押成功！开始赚取 ' + (annualYieldRate ? (Number(annualYieldRate) / 100).toFixed(2) : '5.00') + '% 年化收益。');
     }
   }, [isStakeSuccess, aaveTransferStep]);
 
@@ -361,6 +374,41 @@ export default function Profile() {
     }
   };
 
+  // 从钱包直接质押YD到理财
+  const handleStakeFromWallet = async () => {
+    if (!stakeAmount || parseFloat(stakeAmount) <= 0) {
+      alert('请输入有效的质押金额');
+      return;
+    }
+
+    const amount = parseFloat(stakeAmount);
+    const walletBalance = walletYDBalance ? parseFloat(formatEther(walletYDBalance)) : 0;
+
+    if (amount > walletBalance) {
+      alert(`钱包余额不足！当前余额：${walletBalance.toFixed(4)} YD`);
+      return;
+    }
+
+    try {
+      // 先授权
+      approveYD({
+        address: CONTRACTS.YD_TOKEN,
+        abi: YD_TOKEN_ABI,
+        functionName: 'approve',
+        args: [CONTRACTS.AAVE_INTEGRATION, parseEther(stakeAmount)],
+      });
+
+      // 授权成功后会通过useEffect自动质押
+      setAaveTransferStep('approve');
+      setAaveTransferAmount(stakeAmount);
+      setShowStakeModal(false);
+
+    } catch (error) {
+      console.error('Stake from wallet error:', error);
+      alert('质押失败：' + error.message);
+    }
+  };
+
   // 计算预期收益
   const calculateExpectedReward = () => {
     const amount = parseFloat(calculatorAmount) || 0;
@@ -548,6 +596,12 @@ export default function Profile() {
               <p className="text-xs text-gray-500 mt-1">
                 实时累计中...
               </p>
+              {userStakeInfo && userStakeInfo[4] && Number(userStakeInfo[3]) === 0 && (
+                <p className="text-xs text-green-400 mt-2 flex items-center space-x-1">
+                  <span>✓</span>
+                  <span>追加质押后自动复利到本金</span>
+                </p>
+              )}
             </div>
 
             {/* 年化收益率 */}
@@ -560,6 +614,44 @@ export default function Profile() {
                 复利计息
               </p>
             </div>
+          </div>
+
+          {/* 钱包余额显示 */}
+          <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400 mb-1">钱包中的 YD 余额</p>
+                <p className="text-xl font-bold text-blue-400">
+                  {walletYDBalance ? formatEther(walletYDBalance) : '0.00'} YD
+                </p>
+              </div>
+              <button
+                onClick={() => setShowStakeModal(true)}
+                disabled={
+                  !walletYDBalance ||
+                  Number(walletYDBalance) === 0 ||
+                  (aaveTransferStep && !transferringToAave) ||
+                  isApproving ||
+                  isStaking
+                }
+                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                  !walletYDBalance || Number(walletYDBalance) === 0
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : (aaveTransferStep && !transferringToAave) || isApproving || isStaking
+                    ? 'bg-blue-600 text-white cursor-wait'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isApproving && aaveTransferStep === 'approve' && !transferringToAave
+                  ? '授权中...'
+                  : isStaking && aaveTransferStep === 'stake' && !transferringToAave
+                  ? '质押中...'
+                  : '质押到理财'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              将钱包中的 YD 代币质押到理财合约，开始赚取 {annualYieldRate ? (Number(annualYieldRate) / 100).toFixed(2) : '5.00'}% 年化收益
+            </p>
           </div>
 
           {/* 操作按钮 */}
@@ -667,11 +759,18 @@ export default function Profile() {
 
           {/* 提示信息 */}
           <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-gray-300">
-            <p className="flex items-start space-x-2">
+            <p className="flex items-start space-x-2 mb-2">
               <span className="text-blue-400 mt-0.5">ℹ️</span>
               <span>
                 收益每秒实时累计，点击"领取收益"会将收益自动加入本金进行复利计息，无需手动操作。
                 赎回时会自动结算所有收益。
+              </span>
+            </p>
+            <p className="flex items-start space-x-2">
+              <span className="text-green-400 mt-0.5">✓</span>
+              <span>
+                <strong>当您追加质押时</strong>，待领取收益会自动归零并加入本金（自动复利），这是正常现象！
+                您的收益并未丢失，而是已经转换为本金继续赚取收益。
               </span>
             </p>
           </div>
@@ -953,6 +1052,80 @@ export default function Profile() {
           </div>
         )}
       </div>
+
+      {/* 质押弹窗 */}
+      {showStakeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 border border-purple-500/30">
+            <h3 className="text-2xl font-bold mb-4">质押 YD 到理财账户</h3>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-400 mb-2">可用余额</p>
+              <p className="text-xl font-bold text-blue-400 mb-4">
+                {walletYDBalance ? formatEther(walletYDBalance) : '0.00'} YD
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">质押金额</label>
+              <input
+                type="number"
+                value={stakeAmount}
+                onChange={(e) => setStakeAmount(e.target.value)}
+                className="input-field w-full"
+                placeholder="输入质押金额"
+                min="0"
+                step="0.01"
+              />
+              <button
+                onClick={() => {
+                  if (walletYDBalance) {
+                    setStakeAmount(formatEther(walletYDBalance));
+                  }
+                }}
+                className="text-sm text-blue-400 hover:text-blue-300 mt-2"
+              >
+                最大: {walletYDBalance ? formatEther(walletYDBalance) : '0.00'} YD
+              </button>
+            </div>
+
+            <div className="mb-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm">
+              <p className="text-gray-300">
+                • 年化收益率: <span className="text-blue-400 font-bold">{annualYieldRate ? (Number(annualYieldRate) / 100).toFixed(2) : '5.00'}%</span>
+              </p>
+              <p className="text-gray-300 mt-1">
+                • 收益每秒实时累计，可随时领取
+              </p>
+              <p className="text-gray-300 mt-1">
+                • 随时可赎回本金和收益
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  setShowStakeModal(false);
+                  setStakeAmount('');
+                }}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleStakeFromWallet}
+                disabled={!stakeAmount || parseFloat(stakeAmount) <= 0 || isApproving || isStaking}
+                className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  !stakeAmount || parseFloat(stakeAmount) <= 0 || isApproving || isStaking
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+              >
+                {isApproving ? '授权中...' : isStaking ? '质押中...' : '确认质押'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
