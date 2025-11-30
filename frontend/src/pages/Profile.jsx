@@ -21,6 +21,8 @@ export default function Profile() {
   const [loadingCreated, setLoadingCreated] = useState(true);
   const [withdrawingCourseId, setWithdrawingCourseId] = useState(null);
   const [transferringToAave, setTransferringToAave] = useState(null);
+  const [aaveTransferStep, setAaveTransferStep] = useState(null); // 'withdraw' | 'approve' | 'stake'
+  const [aaveTransferAmount, setAaveTransferAmount] = useState(null);
   const [calculatorAmount, setCalculatorAmount] = useState('1000');
   const [calculatorDays, setCalculatorDays] = useState('365');
 
@@ -68,11 +70,18 @@ export default function Profile() {
     hash: withdrawHash,
   });
 
-  // 转账到 AAVE 的合约调用
-  const { data: transferHash, writeContract: transferToAave } = useWriteContract();
+  // 授权的合约调用
+  const { data: approveHash, writeContract: approveYD } = useWriteContract();
 
-  const { isLoading: isTransferring, isSuccess: isTransferSuccess } = useWaitForTransactionReceipt({
-    hash: transferHash,
+  const { isLoading: isApproving, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
+    hash: approveHash,
+  });
+
+  // 质押到 AAVE 的合约调用
+  const { data: stakeHash, writeContract: stakeToAave } = useWriteContract();
+
+  const { isLoading: isStaking, isSuccess: isStakeSuccess } = useWaitForTransactionReceipt({
+    hash: stakeHash,
   });
 
   useEffect(() => {
@@ -124,15 +133,45 @@ export default function Profile() {
     }
   }, [isWithdrawSuccess]);
 
-  // 转账到理财合约成功后的处理
+  // 监听提取成功后自动执行授权（仅用于转入理财流程）
   useEffect(() => {
-    if (isTransferSuccess) {
+    if (isWithdrawSuccess && aaveTransferStep === 'withdraw' && aaveTransferAmount) {
+      // 步骤1完成，执行步骤2：授权
+      setAaveTransferStep('approve');
+      approveYD({
+        address: CONTRACTS.YD_TOKEN,
+        abi: YD_TOKEN_ABI,
+        functionName: 'approve',
+        args: [CONTRACTS.AAVE_INTEGRATION, parseEther(aaveTransferAmount)],
+      });
+    }
+  }, [isWithdrawSuccess, aaveTransferStep, aaveTransferAmount]);
+
+  // 监听授权成功后自动执行质押
+  useEffect(() => {
+    if (isApproveSuccess && aaveTransferStep === 'approve' && aaveTransferAmount) {
+      // 步骤2完成，执行步骤3：质押
+      setAaveTransferStep('stake');
+      stakeToAave({
+        address: CONTRACTS.AAVE_INTEGRATION,
+        abi: AAVE_INTEGRATION_ABI,
+        functionName: 'stakeYD',
+        args: [parseEther(aaveTransferAmount)],
+      });
+    }
+  }, [isApproveSuccess, aaveTransferStep, aaveTransferAmount]);
+
+  // 监听质押成功后的处理
+  useEffect(() => {
+    if (isStakeSuccess && aaveTransferStep === 'stake') {
       setTransferringToAave(null);
+      setAaveTransferStep(null);
+      setAaveTransferAmount(null);
       refetchStakeInfo();
       loadCreatedCourses();
       alert('收益已成功存入理财账户！开始赚取 ' + (annualYieldRate ? (Number(annualYieldRate) / 100).toFixed(2) : '5.00') + '% 年化收益。');
     }
-  }, [isTransferSuccess]);
+  }, [isStakeSuccess, aaveTransferStep]);
 
   const loadProfile = async () => {
     try {
@@ -258,10 +297,17 @@ export default function Profile() {
       return;
     }
 
+    if (parseFloat(revenueAmount) <= 0) {
+      alert('收益金额必须大于0');
+      return;
+    }
+
     try {
       setTransferringToAave(courseId);
+      setAaveTransferStep('withdraw');
+      setAaveTransferAmount(revenueAmount);
 
-      // 先提取收益到用户钱包
+      // 步骤1：先提取收益到用户钱包
       withdrawRevenue({
         address: CONTRACTS.COURSE_MANAGER,
         abi: COURSE_MANAGER_ABI,
@@ -269,43 +315,24 @@ export default function Profile() {
         args: [courseId],
       });
 
-      // 等待提取交易确认后，再授权并质押
-      // 注意：这里使用简化方式，实际需要监听交易状态
-      alert('步骤 1/3：正在提取收益到钱包...');
-
-      setTimeout(() => {
-        alert('步骤 2/3：请授权 AAVE 合约使用您的 YD Token');
-        // 授权 AAVE 合约
-        transferToAave({
-          address: CONTRACTS.YD_TOKEN,
-          abi: YD_TOKEN_ABI,
-          functionName: 'approve',
-          args: [CONTRACTS.AAVE_INTEGRATION, parseEther(revenueAmount)],
-        });
-
-        setTimeout(() => {
-          alert('步骤 3/3：正在将 YD Token 质押到理财合约...');
-          // 质押到 AAVE
-          transferToAave({
-            address: CONTRACTS.AAVE_INTEGRATION,
-            abi: AAVE_INTEGRATION_ABI,
-            functionName: 'stakeYD',
-            args: [parseEther(revenueAmount)],
-          });
-        }, 3000);
-      }, 3000);
+      // 后续步骤会通过 useEffect 自动触发：
+      // - 提取成功后 → 自动授权
+      // - 授权成功后 → 自动质押
+      // - 质押成功后 → 显示成功提示
 
     } catch (error) {
       console.error('Withdraw to AAVE error:', error);
       alert('操作失败：' + error.message);
       setTransferringToAave(null);
+      setAaveTransferStep(null);
+      setAaveTransferAmount(null);
     }
   };
 
   // 领取理财收益
   const handleClaimReward = async () => {
     try {
-      transferToAave({
+      stakeToAave({
         address: CONTRACTS.AAVE_INTEGRATION,
         abi: AAVE_INTEGRATION_ABI,
         functionName: 'claimReward',
@@ -323,7 +350,7 @@ export default function Profile() {
     }
 
     try {
-      transferToAave({
+      stakeToAave({
         address: CONTRACTS.AAVE_INTEGRATION,
         abi: AAVE_INTEGRATION_ABI,
         functionName: 'unstake',
@@ -513,7 +540,7 @@ export default function Profile() {
             {/* 待领取收益 */}
             <div className="bg-white/5 rounded-lg p-4 border border-green-500/20">
               <p className="text-sm text-gray-400 mb-1">待领取收益</p>
-              <p className="text-2xl font-bold text-green-400">
+              <p className="text-2xl font-bold text-green-400 break-all">
                 {userStakeInfo && userStakeInfo[4]
                   ? formatEther(userStakeInfo[3])
                   : '0.00'} YD
@@ -611,7 +638,7 @@ export default function Profile() {
                 <TrendingUp className="h-5 w-5 text-green-400" />
                 <p className="text-sm text-gray-400">当前总收益</p>
               </div>
-              <p className="text-2xl font-bold text-green-400">
+              <p className="text-2xl font-bold text-green-400 break-all">
                 {formatEther(userStakeInfo[3])} YD
               </p>
               <p className="text-xs text-gray-500 mt-1">
@@ -839,14 +866,16 @@ export default function Profile() {
                       disabled={
                         parseFloat(course.revenue) === 0 ||
                         transferringToAave === course.id ||
-                        isTransferring ||
+                        (isWithdrawing && aaveTransferStep === 'withdraw') ||
+                        (isApproving && aaveTransferStep === 'approve') ||
+                        (isStaking && aaveTransferStep === 'stake') ||
                         withdrawingCourseId === course.id ||
                         !CONTRACTS.AAVE_INTEGRATION
                       }
                       className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-1 ${
                         parseFloat(course.revenue) === 0 || !CONTRACTS.AAVE_INTEGRATION
                           ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                          : transferringToAave === course.id || isTransferring
+                          : transferringToAave === course.id
                           ? 'bg-purple-600 text-white cursor-wait'
                           : 'bg-purple-600 hover:bg-purple-700 text-white'
                       }`}
@@ -854,8 +883,14 @@ export default function Profile() {
                     >
                       <Wallet className="h-4 w-4" />
                       <span>
-                        {transferringToAave === course.id || isTransferring
-                          ? '转入中...'
+                        {transferringToAave === course.id
+                          ? aaveTransferStep === 'withdraw'
+                            ? '提取中(1/3)...'
+                            : aaveTransferStep === 'approve'
+                            ? '授权中(2/3)...'
+                            : aaveTransferStep === 'stake'
+                            ? '质押中(3/3)...'
+                            : '转入中...'
                           : '转入理财'}
                       </span>
                     </button>
