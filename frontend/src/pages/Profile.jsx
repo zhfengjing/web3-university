@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useSignMessage, useReadContract, useConfig } from 'wagmi';
+import { useAccount, useSignMessage, useReadContract, useConfig, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { readContract } from '@wagmi/core';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { User, BookOpen, Edit2, Save, X } from 'lucide-react';
+import { User, BookOpen, Edit2, Save, X, DollarSign, TrendingUp } from 'lucide-react';
 import { API_URL, CONTRACTS, COURSE_MANAGER_ABI } from '../config/contracts';
 import { formatEther } from 'viem';
 
@@ -17,6 +17,9 @@ export default function Profile() {
   const [newName, setNewName] = useState('');
   const [purchasedCourses, setPurchasedCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [createdCourses, setCreatedCourses] = useState([]);
+  const [loadingCreated, setLoadingCreated] = useState(true);
+  const [withdrawingCourseId, setWithdrawingCourseId] = useState(null);
 
   // 读取用户购买记录
   const { data: purchases } = useReadContract({
@@ -24,6 +27,20 @@ export default function Profile() {
     abi: COURSE_MANAGER_ABI,
     functionName: 'getUserPurchases',
     args: [address],
+  });
+
+  // 读取课程总数
+  const { data: courseCount } = useReadContract({
+    address: CONTRACTS.COURSE_MANAGER,
+    abi: COURSE_MANAGER_ABI,
+    functionName: 'courseCount',
+  });
+
+  // 提取收益的合约调用
+  const { data: withdrawHash, writeContract: withdrawRevenue } = useWriteContract();
+
+  const { isLoading: isWithdrawing, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({
+    hash: withdrawHash,
   });
 
   useEffect(() => {
@@ -39,6 +56,21 @@ export default function Profile() {
       setLoading(false);
     }
   }, [purchases]);
+
+  useEffect(() => {
+    if (courseCount && address) {
+      loadCreatedCourses();
+    }
+  }, [courseCount, address]);
+
+  // 提取成功后重新加载课程收益
+  useEffect(() => {
+    if (isWithdrawSuccess) {
+      loadCreatedCourses();
+      setWithdrawingCourseId(null);
+      alert('收益提取成功！');
+    }
+  }, [isWithdrawSuccess]);
 
   const loadProfile = async () => {
     try {
@@ -83,6 +115,65 @@ export default function Profile() {
       console.error('Load courses error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCreatedCourses = async () => {
+    try {
+      setLoadingCreated(true);
+      const coursesData = [];
+      const count = Number(courseCount);
+
+      for (let i = 1; i <= count; i++) {
+        const course = await readContract(config, {
+          address: CONTRACTS.COURSE_MANAGER,
+          abi: COURSE_MANAGER_ABI,
+          functionName: 'getCourse',
+          args: [i],
+        });
+
+        // 只获取当前用户创建的课程
+        if (course.author.toLowerCase() === address.toLowerCase()) {
+          // 获取该课程的收益
+          const revenue = await readContract(config, {
+            address: CONTRACTS.COURSE_MANAGER,
+            abi: COURSE_MANAGER_ABI,
+            functionName: 'courseRevenue',
+            args: [i],
+          });
+
+          coursesData.push({
+            id: Number(course.id),
+            title: course.title,
+            description: course.description,
+            priceInYD: formatEther(course.priceInYD),
+            totalEnrolled: Number(course.totalEnrolled),
+            revenue: formatEther(revenue),
+          });
+        }
+      }
+
+      setCreatedCourses(coursesData);
+    } catch (error) {
+      console.error('Load created courses error:', error);
+    } finally {
+      setLoadingCreated(false);
+    }
+  };
+
+  const handleWithdrawRevenue = async (courseId) => {
+    try {
+      setWithdrawingCourseId(courseId);
+      withdrawRevenue({
+        address: CONTRACTS.COURSE_MANAGER,
+        abi: COURSE_MANAGER_ABI,
+        functionName: 'withdrawCourseRevenue',
+        args: [courseId],
+      });
+    } catch (error) {
+      console.error('Withdraw revenue error:', error);
+      alert('提取失败：' + error.message);
+      setWithdrawingCourseId(null);
     }
   };
 
@@ -206,6 +297,89 @@ export default function Profile() {
             通过 MetaMask 签名验证身份后可修改
           </p>
         </div>
+      </div>
+
+      {/* Created Courses & Revenue */}
+      <div className="card mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">我的创作</h2>
+          <div className="flex items-center space-x-2 text-gray-300">
+            <TrendingUp className="h-5 w-5" />
+            <span>{createdCourses.length} 门课程</span>
+          </div>
+        </div>
+
+        {loadingCreated ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+          </div>
+        ) : createdCourses.length === 0 ? (
+          <div className="text-center py-12">
+            <BookOpen className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400 mb-4">您还没有创建任何课程</p>
+            <Link to="/create-course" className="btn-primary inline-block">
+              创建课程
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {createdCourses.map((course) => (
+              <div
+                key={course.id}
+                className="bg-white/5 rounded-lg p-4 border border-white/10"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <Link to={`/courses/${course.id}`} className="hover:text-blue-400">
+                      <h3 className="text-lg font-bold mb-2">{course.title}</h3>
+                    </Link>
+                    <p className="text-gray-300 text-sm line-clamp-2 mb-2">
+                      {course.description}
+                    </p>
+                    <div className="flex items-center space-x-4 text-sm text-gray-400">
+                      <span>价格: {course.priceInYD} YD</span>
+                      <span>学员: {course.totalEnrolled} 人</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-5 w-5 text-green-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">可提取收益</p>
+                      <p className="text-lg font-bold text-green-400">
+                        {course.revenue} YD
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleWithdrawRevenue(course.id)}
+                    disabled={
+                      parseFloat(course.revenue) === 0 ||
+                      withdrawingCourseId === course.id ||
+                      isWithdrawing
+                    }
+                    className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                      parseFloat(course.revenue) === 0
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : withdrawingCourseId === course.id || isWithdrawing
+                        ? 'bg-blue-600 text-white cursor-wait'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                    }`}
+                  >
+                    {withdrawingCourseId === course.id || isWithdrawing
+                      ? '提取中...'
+                      : parseFloat(course.revenue) === 0
+                      ? '暂无收益'
+                      : '提取收益'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Purchased Courses */}
