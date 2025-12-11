@@ -306,22 +306,82 @@ body('name').trim().isLength({ min: 1, max: 100 })
 
 ## 部署
 
-### 开发环境
+### 传统部署（Node.js 服务器）
+
+#### 开发环境
 ```bash
 npm run dev
 ```
 
-### 生产环境
+#### 生产环境
 ```bash
 npm start
 ```
 
-### 使用 PM2
+#### 使用 PM2
 ```bash
 npm install -g pm2
 pm2 start server.js --name web3-university-api
 pm2 save
 ```
+
+### Cloudflare Workers 部署
+
+本项目支持部署到 Cloudflare Workers，享受全球边缘网络和无服务器架构的优势。
+
+#### 快速开始
+
+1. **安装依赖**
+```bash
+npm install
+```
+
+2. **登录 Cloudflare**
+```bash
+npm run workers:login
+```
+
+3. **本地开发**
+```bash
+npm run workers:dev
+```
+
+4. **部署到生产**
+```bash
+npm run workers:deploy
+```
+
+#### 详细文档
+
+查看完整的 Cloudflare Workers 部署指南：
+**[CLOUDFLARE_WORKERS_DEPLOYMENT.md](./CLOUDFLARE_WORKERS_DEPLOYMENT.md)**
+
+#### Workers 特性
+
+- ✅ 全球边缘网络，低延迟
+- ✅ 自动扩展，无需配置
+- ✅ 支持多种数据库方案（D1, Neon, Supabase）
+- ✅ 免费额度充足（每天 100,000 次请求）
+- ✅ 内置 DDoS 防护和 CDN
+
+#### 可用命令
+
+| 命令 | 说明 |
+|------|------|
+| `npm run workers:dev` | 本地开发服务器 |
+| `npm run workers:deploy` | 部署到生产环境 |
+| `npm run workers:tail` | 查看实时日志 |
+| `npm run workers:login` | 登录 Cloudflare |
+
+#### 数据库选项
+
+Cloudflare Workers 支持以下数据库方案：
+
+1. **Cloudflare D1**（推荐）- 内置 SQLite 数据库
+2. **Neon PostgreSQL** - 无服务器 PostgreSQL
+3. **Supabase** - 开源 PostgreSQL 平台
+
+详细配置请参考：[CLOUDFLARE_WORKERS_DEPLOYMENT.md](./CLOUDFLARE_WORKERS_DEPLOYMENT.md)
 
 ## 常见问题
 

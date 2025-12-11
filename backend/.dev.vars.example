@@ -1,0 +1,24 @@
+# Cloudflare Workers 本地开发环境变量示例
+# 复制此文件为 .dev.vars 并填入实际值
+# .dev.vars 文件不会被提交到 git
+
+# 应用配置
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000
+
+# 数据库配置 - 选择以下一种方案
+
+# 选项 1: Cloudflare D1
+# 在 wrangler.toml 中配置，无需环境变量
+
+# 选项 2: Neon PostgreSQL
+# NEON_CONNECTION_STRING=https://your-project.neon.tech
+
+# 选项 3: Supabase
+# SUPABASE_URL=https://your-project.supabase.co
+# SUPABASE_KEY=your-api-key
+
+# 智能合约地址（可选）
+YD_TOKEN_ADDRESS=
+COURSE_MANAGER_ADDRESS=
+AAVE_INTEGRATION_ADDRESS=
